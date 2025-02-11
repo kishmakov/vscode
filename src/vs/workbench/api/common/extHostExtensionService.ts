@@ -522,7 +522,7 @@ export abstract class AbstractExtHostExtensionService extends Disposable impleme
 				? this._initData.messagePorts?.get(ExtensionIdentifier.toKey(extensionDescription.identifier))
 				: undefined;
 
-			return Object.freeze<vscode.ExtensionContext>({
+			const result = Object.freeze<vscode.ExtensionContext>({
 				globalState,
 				workspaceState,
 				secrets,
@@ -566,6 +566,12 @@ export abstract class AbstractExtHostExtensionService extends Disposable impleme
 					return messagePassingProtocol;
 				}
 			});
+
+			if (getAPI('vscode-api') !== 'initial') {
+				setAPI('context-api', result);
+			}
+
+			return result;
 		});
 	}
 

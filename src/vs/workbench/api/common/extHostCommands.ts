@@ -244,6 +244,20 @@ export class ExtHostCommands implements ExtHostCommandsShape {
 			}
 		}
 
+		// if (isMainThread) {
+		// 	const worker = new Worker("/home/kishmakov/Repos/vscode/out/vs/workbench/api/common/extHostCommands.js");
+		// 	worker.once('message', (message: any) => {
+		// 		console.log(message);  // Prints 'Hello, world!'.
+		// 	});
+		//
+		// 	worker.postMessage('>>> Hello, world!');
+		// } else {
+		// 	// When a message from the parent thread is received, send it back:
+		// 	parentPort?.once('message', (message: any) => {
+		// 		delay().then(() => parentPort?.postMessage(message));
+		// 	});
+		// }
+
 		const stopWatch = StopWatch.create();
 		try {
 			return await callback.apply(thisArg, args);
