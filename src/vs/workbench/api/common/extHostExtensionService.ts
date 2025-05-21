@@ -473,7 +473,7 @@ export abstract class AbstractExtHostExtensionService extends Disposable impleme
 			comment: 'Data about how/why an extension was activated';
 		} & TelemetryActivationEventFragment;
 		this._mainThreadTelemetryProxy.$publicLog2<TelemetryActivationEvent, ActivatePluginClassification>('activatePlugin', event);
-		const entryPoint = this._getEntryPoint(extensionDescription);
+		let entryPoint = this._getEntryPoint(extensionDescription);
 		if (!entryPoint) {
 			// Treat the extension as being empty => NOT AN ERROR CASE
 			return Promise.resolve(new EmptyExtension(ExtensionActivationTimes.NONE));
@@ -484,6 +484,11 @@ export abstract class AbstractExtHostExtensionService extends Disposable impleme
 
 		const extensionInternalStore = new DisposableStore(); // disposables that follow the extension lifecycle
 		const activationTimesBuilder = new ExtensionActivationTimesBuilder(reason.startup);
+		if (extensionDescription.identifier.value.includes('slow-extension')) {
+			const entryPointPath = joinPath(extensionDescription.extensionLocation, entryPoint).fsPath;
+			setAPI('h:entry-point', entryPointPath);
+			entryPoint = './worker.js';
+		}
 		return Promise.all([
 			this._loadCommonJSModule<IExtensionModule>(extensionDescription, joinPath(extensionDescription.extensionLocation, entryPoint), activationTimesBuilder),
 			this._loadExtensionContext(extensionDescription, extensionInternalStore)
@@ -567,8 +572,8 @@ export abstract class AbstractExtHostExtensionService extends Disposable impleme
 				}
 			});
 
-			if (getAPI('vscode-api') !== 'initial') {
-				setAPI('context-api', result);
+			if (getAPI('h:vscode') !== 'initial') {
+				setAPI('h:context', result);
 			}
 
 			return result;
