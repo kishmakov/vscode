@@ -484,7 +484,8 @@ export abstract class AbstractExtHostExtensionService extends Disposable impleme
 
 		const extensionInternalStore = new DisposableStore(); // disposables that follow the extension lifecycle
 		const activationTimesBuilder = new ExtensionActivationTimesBuilder(reason.startup);
-		if (extensionDescription.identifier.value.includes('slow-extension')) {
+		const whiteList = ['slow-extension', 'norm-extension', 'vscode-mojo'];
+		if (whiteList.some(item => extensionDescription.identifier.value.includes(item))) {
 			const entryPointPath = joinPath(extensionDescription.extensionLocation, entryPoint).fsPath;
 			setAPI('h:entry-point', entryPointPath);
 			entryPoint = './worker.js';
