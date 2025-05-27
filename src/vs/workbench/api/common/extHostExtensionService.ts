@@ -488,6 +488,7 @@ export abstract class AbstractExtHostExtensionService extends Disposable impleme
 		if (whiteList.some(item => extensionDescription.identifier.value.includes(item))) {
 			const entryPointPath = joinPath(extensionDescription.extensionLocation, entryPoint).fsPath;
 			setAPI('h:entry-point', entryPointPath);
+			setAPI('h:id', extensionDescription.identifier.value);
 			entryPoint = './worker.js';
 		}
 		return Promise.all([
