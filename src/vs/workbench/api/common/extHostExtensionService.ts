@@ -487,8 +487,9 @@ export abstract class AbstractExtHostExtensionService extends Disposable impleme
 		const whiteList = ['slow-extension', 'norm-extension', 'vscode-mojo', 'c-cpp-compile-run', 'LiveServer', 'prettier-vscode'];
 		if (whiteList.some(item => extensionDescription.identifier.value.includes(item))) {
 			const entryPointPath = joinPath(extensionDescription.extensionLocation, entryPoint).fsPath;
-			setAPI('h:entry-point', entryPointPath);
-			setAPI('h:id', extensionDescription.identifier.value);
+			const id = extensionDescription.identifier.value.replace(/\./g, '');
+			setAPI('h:id', id);
+			setAPI(`h:entry-point.${id}`, entryPointPath);
 			entryPoint = './worker.js';
 		}
 		return Promise.all([
@@ -574,10 +575,8 @@ export abstract class AbstractExtHostExtensionService extends Disposable impleme
 				}
 			});
 
-			// console.warn(`>>> ${result.extension.id}`);
-			if (getAPI('h:id') === result.extension.id) {
-				setAPI('h:context', result);
-			}
+			const id = extensionDescription.identifier.value.replace(/\./g, '');
+			setAPI(`h:context.${id}`, result);
 
 			return result;
 		});
