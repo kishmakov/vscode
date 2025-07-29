@@ -484,19 +484,17 @@ export abstract class AbstractExtHostExtensionService extends Disposable impleme
 
 		const extensionInternalStore = new DisposableStore(); // disposables that follow the extension lifecycle
 		const activationTimesBuilder = new ExtensionActivationTimesBuilder(reason.startup);
-		let epp = '';
 		const whiteList = ['slow-extension', 'norm-extension', 'vscode-mojo', 'c-cpp-compile-run', 'LiveServer', 'prettier-vscode'];
 		if (whiteList.some(item => extensionDescription.identifier.value.includes(item))) {
-			epp = joinPath(extensionDescription.extensionLocation, entryPoint).fsPath;
+			const epp = joinPath(extensionDescription.extensionLocation, entryPoint).fsPath;
 			const id = extensionDescription.identifier.value.replace(/\./g, '');
 			setAPI('h:id', id);
 			setAPI(`h:entry-point.${id}`, epp);
-			console.warn(`>>> +id=${id}`);
 			entryPoint = './worker.js';
 		}
 		return Promise.all([
 			this._loadCommonJSModule<IExtensionModule>(extensionDescription, joinPath(extensionDescription.extensionLocation, entryPoint), activationTimesBuilder),
-			this._loadExtensionContext(extensionDescription, extensionInternalStore, epp)
+			this._loadExtensionContext(extensionDescription, extensionInternalStore)
 		]).then(values => {
 			performance.mark(`code/extHost/willActivateExtension/${extensionDescription.identifier.value}`);
 			return AbstractExtHostExtensionService._callActivate(this._logService, extensionDescription.identifier, values[0], values[1], extensionInternalStore, activationTimesBuilder);
@@ -506,7 +504,7 @@ export abstract class AbstractExtHostExtensionService extends Disposable impleme
 		});
 	}
 
-	private _loadExtensionContext(extensionDescription: IExtensionDescription, extensionInternalStore: DisposableStore, epp: string): Promise<vscode.ExtensionContext> {
+	private _loadExtensionContext(extensionDescription: IExtensionDescription, extensionInternalStore: DisposableStore): Promise<vscode.ExtensionContext> {
 
 		const languageModelAccessInformation = this._extHostLanguageModels.createLanguageModelAccessInformation(extensionDescription);
 		const globalState = extensionInternalStore.add(new ExtensionGlobalMemento(extensionDescription, this._storage));
@@ -576,13 +574,6 @@ export abstract class AbstractExtHostExtensionService extends Disposable impleme
 					return messagePassingProtocol;
 				}
 			});
-
-			if (epp !== '') {
-				setAPI(epp, result);
-				console.warn(`>>> set=${epp}`);
-			} else {
-				console.warn(`>>> notset`);
-			}
 
 			return result;
 		});
