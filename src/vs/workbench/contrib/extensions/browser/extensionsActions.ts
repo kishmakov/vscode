@@ -3123,7 +3123,8 @@ export class RunInIsolationAction extends ExtensionAction {
 
 	constructor(
 		@IFileService private readonly fileService: IFileService,
-		@IExtensionService private readonly extensionService: IExtensionService
+		@IExtensionService private readonly extensionService: IExtensionService,
+		@IExtensionsWorkbenchService private readonly extensionsWorkbenchService: IExtensionsWorkbenchService
 	) {
 		super(RunInIsolationAction.ID, RunInIsolationAction.LABEL, RunInIsolationAction.Class);
 		this.tooltip = localize('runInIsolationActionToolTip', "Run this extension in isolation mode");
@@ -3160,10 +3161,7 @@ export class RunInIsolationAction extends ExtensionAction {
 			const exists = await this.fileService.exists(URI.file(this.workerPath));
 			if (!exists) {
 				await this.fileService.writeFile(URI.file(this.workerPath), VSBuffer.fromString(content));
-
-				// This will restart the extension hosts immediately without showing a dialog
-				await this.extensionService.stopExtensionHosts(localize('restartExtensionHost.reason', "Running extension in isolation mode"));
-				this.extensionService.startExtensionHosts();
+				this.extensionsWorkbenchService.markToRunInIsolation(this.extension);
 			}
 		} catch (err) {
 			alert(localize('runInIsolationWorkerError', "Failed to create worker.js: {0}", err.message));
