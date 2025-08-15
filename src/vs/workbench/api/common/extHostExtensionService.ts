@@ -466,14 +466,14 @@ export abstract class AbstractExtHostExtensionService extends Disposable impleme
 		});
 	}
 
-	private _doActivateExtension(extensionDescription: IExtensionDescription, reason: ExtensionActivationReason): Promise<ActivatedExtension> {
+	private async _doActivateExtension(extensionDescription: IExtensionDescription, reason: ExtensionActivationReason): Promise<ActivatedExtension> {
 		const event = getTelemetryActivationEvent(extensionDescription, reason);
 		type ActivatePluginClassification = {
 			owner: 'jrieken';
 			comment: 'Data about how/why an extension was activated';
 		} & TelemetryActivationEventFragment;
 		this._mainThreadTelemetryProxy.$publicLog2<TelemetryActivationEvent, ActivatePluginClassification>('activatePlugin', event);
-		let entryPoint = this._getEntryPoint(extensionDescription);
+		const entryPoint = this._getEntryPoint(extensionDescription);
 		if (!entryPoint) {
 			// Treat the extension as being empty => NOT AN ERROR CASE
 			return Promise.resolve(new EmptyExtension(ExtensionActivationTimes.NONE));
@@ -484,16 +484,21 @@ export abstract class AbstractExtHostExtensionService extends Disposable impleme
 
 		const extensionInternalStore = new DisposableStore(); // disposables that follow the extension lifecycle
 		const activationTimesBuilder = new ExtensionActivationTimesBuilder(reason.startup);
-		const whiteList = ['slow-extension', 'norm-extension', 'vscode-mojo', 'c-cpp-compile-run', 'LiveServer', 'prettier-vscode'];
-		if (whiteList.some(item => extensionDescription.identifier.value.includes(item))) {
-			const epp = joinPath(extensionDescription.extensionLocation, entryPoint).fsPath;
+
+		let fullEntryPoint = joinPath(extensionDescription.extensionLocation, entryPoint);
+		const workerPath = joinPath(extensionDescription.extensionLocation, './worker.js');
+
+		// Use the async fsExists method from IHostUtils
+		const workerPathExists = this._hostUtils.fsExists ? await this._hostUtils.fsExists(workerPath.fsPath) : false;
+		if (workerPathExists) {
 			const id = extensionDescription.identifier.value.replace(/\./g, '');
 			setAPI('h:id', id);
-			setAPI(`h:entry-point.${id}`, epp);
-			entryPoint = './worker.js';
+			setAPI(`h:entry-point.${id}`, fullEntryPoint.fsPath);
+			fullEntryPoint = workerPath;
 		}
+
 		return Promise.all([
-			this._loadCommonJSModule<IExtensionModule>(extensionDescription, joinPath(extensionDescription.extensionLocation, entryPoint), activationTimesBuilder),
+			this._loadCommonJSModule<IExtensionModule>(extensionDescription, fullEntryPoint, activationTimesBuilder),
 			this._loadExtensionContext(extensionDescription, extensionInternalStore)
 		]).then(values => {
 			performance.mark(`code/extHost/willActivateExtension/${extensionDescription.identifier.value}`);
