@@ -149,6 +149,7 @@ export interface IExtensionsWorkbenchService {
 	setLanguage(extension: IExtension): Promise<void>;
 	setEnablement(extensions: IExtension | IExtension[], enablementState: EnablementState): Promise<void>;
 	markToRunInIsolation(extension: IExtension): void;
+	markToRunNormally(extension: IExtension): void;
 	isAutoUpdateEnabledFor(extensionOrPublisher: IExtension | string): boolean;
 	updateAutoUpdateEnablementFor(extensionOrPublisher: IExtension | string, enable: boolean): Promise<void>;
 	shouldRequireConsentToUpdate(extension: IExtension): Promise<string | undefined>;

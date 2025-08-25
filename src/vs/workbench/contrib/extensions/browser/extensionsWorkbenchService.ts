@@ -915,6 +915,7 @@ export class ExtensionsWorkbenchService extends Disposable implements IExtension
 	private readonly webExtensions: Extensions | null = null;
 	private readonly extensionsServers: Extensions[] = [];
 	private markedForIsolation: IExtension[] = [];
+	private markedForNormalExecution: IExtension[] = [];
 
 	private updatesCheckDelayer: ThrottledDelayer<void>;
 	private autoUpdateDelayer: ThrottledDelayer<void>;
@@ -1608,6 +1609,10 @@ export class ExtensionsWorkbenchService extends Disposable implements IExtension
 		while (this.markedForIsolation.length > 0) {
 			this.onDidChangeExtensions(this.markedForIsolation.pop());
 		}
+
+		while (this.markedForNormalExecution.length > 0) {
+			this.onDidChangeExtensions(this.markedForNormalExecution.pop());
+		}
 	}
 
 	private getRuntimeState(extension: IExtension): ExtensionRuntimeState | undefined {
@@ -1618,6 +1623,10 @@ export class ExtensionsWorkbenchService extends Disposable implements IExtension
 
 		if (this.markedForIsolation.some(e => areSameExtensions(e.identifier, extension.identifier))) {
 			return { action: reloadAction, reason: `Please ${reloadActionLabel} to isolate this extension.` };
+		}
+
+		if (this.markedForNormalExecution.some(e => areSameExtensions(e.identifier, extension.identifier))) {
+			return { action: reloadAction, reason: `Please ${reloadActionLabel} to run this extension normally.` };
 		}
 
 		if (isUninstalled) {
@@ -2564,6 +2573,11 @@ export class ExtensionsWorkbenchService extends Disposable implements IExtension
 
 	markToRunInIsolation(extension: IExtension) {
 		this.markedForIsolation.push(extension);
+		this.onDidChangeExtensions(extension);
+	}
+
+	markToRunNormally(extension: IExtension) {
+		this.markedForNormalExecution.push(extension);
 		this.onDidChangeExtensions(extension);
 	}
 

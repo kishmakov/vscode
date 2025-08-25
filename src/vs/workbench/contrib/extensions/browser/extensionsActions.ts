@@ -1346,7 +1346,11 @@ export class ManageExtensionAction extends DropDownExtensionAction {
 		groups.push([
 			...(installActions.length ? installActions : []),
 			this.instantiationService.createInstance(InstallAnotherVersionAction, this.extension, false),
-			this.instantiationService.createInstance(UninstallAction),
+			this.instantiationService.createInstance(UninstallAction)
+		]);
+
+		groups.push([
+			this.instantiationService.createInstance(RunNormallyAction),
 			this.instantiationService.createInstance(RunInIsolationAction)
 		]);
 
@@ -3165,6 +3169,58 @@ export class RunInIsolationAction extends ExtensionAction {
 			}
 		} catch (err) {
 			alert(localize('runInIsolationWorkerError', "Failed to create worker.js: {0}", err.message));
+		}
+	}
+}
+
+export class RunNormallyAction extends ExtensionAction {
+	static readonly ID = 'extensions.runNormally';
+	static readonly LABEL = localize('runNormallyAction', "Run Normally");
+	private static readonly Class = `${ExtensionAction.LABEL_ACTION_CLASS} run-normally`;
+
+	constructor(
+		@IFileService private readonly fileService: IFileService,
+		@IExtensionService private readonly extensionService: IExtensionService,
+		@IExtensionsWorkbenchService private readonly extensionsWorkbenchService: IExtensionsWorkbenchService
+	) {
+		super(RunNormallyAction.ID, RunNormallyAction.LABEL, RunNormallyAction.Class);
+		this.tooltip = localize('runNormallyActionToolTip', "Remove isolation mode and run this extension normally");
+		this.update();
+		this._register(this.extensionService.onDidChangeExtensions(() => this.update()));
+	}
+
+	get workerPath(): string | undefined {
+		if (this.extension && this.extension.local) {
+			const baseDir = this.extension.local.location.fsPath;
+			return path.join(baseDir, 'worker.js');
+		}
+		return undefined;
+	}
+
+	update(): void {
+		this.enabled = false;
+		if (this.extension && this.extension.local && this.extension.state === ExtensionState.Installed) {
+			if (!this.extension.isBuiltin && this.workerPath) {
+				this.fileService.exists(URI.file(this.workerPath)).then(exists => {
+					this.enabled = exists;
+				});
+			}
+		}
+	}
+
+	override async run(): Promise<any> {
+		if (!this.extension || !this.extension.local || !this.workerPath) {
+			return;
+		}
+
+		try {
+			const exists = await this.fileService.exists(URI.file(this.workerPath));
+			if (exists) {
+				await this.fileService.del(URI.file(this.workerPath));
+				this.extensionsWorkbenchService.markToRunNormally(this.extension);
+			}
+		} catch (err) {
+			alert(localize('runNormallyWorkerError', "Failed to remove worker.js: {0}", err.message));
 		}
 	}
 }
