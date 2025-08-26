@@ -246,7 +246,7 @@
 		},
 		{
 			"type": "shell",
-			"command": "./clean.sh && node build/lib/preLaunch.js",
+			"command": "node build/lib/preLaunch.js",
 			"label": "Ensure Prelaunch Dependencies",
 			"presentation": {
 				"reveal": "silent",
