@@ -73,6 +73,9 @@ import { IUpdateService } from '../../../../platform/update/common/update.js';
 import { ActionWithDropdownActionViewItem, IActionWithDropdownActionViewItemOptions } from '../../../../base/browser/ui/dropdown/dropdownActionViewItem.js';
 import { IAuthenticationUsageService } from '../../../services/authentication/browser/authenticationUsageService.js';
 
+import * as path from '../../../../base/common/path.js';
+import { VSBuffer } from '../../../../base/common/buffer.js';
+
 export class PromptExtensionInstallFailureAction extends Action {
 
 	constructor(
@@ -1343,7 +1346,12 @@ export class ManageExtensionAction extends DropDownExtensionAction {
 		groups.push([
 			...(installActions.length ? installActions : []),
 			this.instantiationService.createInstance(InstallAnotherVersionAction, this.extension, false),
-			this.instantiationService.createInstance(UninstallAction),
+			this.instantiationService.createInstance(UninstallAction)
+		]);
+
+		groups.push([
+			this.instantiationService.createInstance(RunNormallyAction),
+			this.instantiationService.createInstance(RunInIsolationAction)
 		]);
 
 		otherActionGroups.forEach(actions => groups.push(actions));
@@ -3110,6 +3118,112 @@ CommandsRegistry.registerCommand('workbench.extensions.action.showExtensionsForL
 	const extensionsWorkbenchService = accessor.get(IExtensionsWorkbenchService);
 	return extensionsWorkbenchService.openSearch(`ext:${fileExtension.replace(/^\./, '')}`);
 });
+
+export class RunInIsolationAction extends ExtensionAction {
+	static readonly ID = 'extensions.runInIsolation';
+	static readonly LABEL = localize('runInIsolationAction', "Run in Isolation");
+	static readonly WORKER_CONTENT = `(() => {"use strict";	const id = getAPI('h:id.worker'); setAPI('h:id.worker', 'initial');	function activate(context) { setAPI(\`h:context.\${id}\`, context); } setAPI(\`h:vscode.\${id}\`, require("vscode")); module.exports = { activate };})();`;
+	private static readonly Class = `${ExtensionAction.LABEL_ACTION_CLASS} run-in-isolation`;
+
+	constructor(
+		@IFileService private readonly fileService: IFileService,
+		@IExtensionService private readonly extensionService: IExtensionService,
+		@IExtensionsWorkbenchService private readonly extensionsWorkbenchService: IExtensionsWorkbenchService
+	) {
+		super(RunInIsolationAction.ID, RunInIsolationAction.LABEL, RunInIsolationAction.Class);
+		this.tooltip = localize('runInIsolationActionToolTip', "Run this extension in isolation mode");
+		this.update();
+		this._register(this.extensionService.onDidChangeExtensions(() => this.update()));
+	}
+
+	get workerPath(): string | undefined {
+		if (this.extension && this.extension.local) {
+			const baseDir = this.extension.local.location.fsPath;
+			return path.join(baseDir, 'worker.js');
+		}
+		return undefined;
+	}
+
+	update(): void {
+		this.enabled = false;
+		if (this.extension && this.extension.local && this.extension.state === ExtensionState.Installed) {
+			if (!this.extension.isBuiltin && this.workerPath) {
+				this.fileService.exists(URI.file(this.workerPath)).then(exists => {
+					this.enabled = !exists;
+				});
+			}
+		}
+	}
+
+	override async run(): Promise<any> {
+		if (!this.extension || !this.extension.local || !this.workerPath) {
+			return;
+		}
+
+		const content = RunInIsolationAction.WORKER_CONTENT;
+		try {
+			const exists = await this.fileService.exists(URI.file(this.workerPath));
+			if (!exists) {
+				await this.fileService.writeFile(URI.file(this.workerPath), VSBuffer.fromString(content));
+				this.extensionsWorkbenchService.markToRunInIsolation(this.extension);
+			}
+		} catch (err) {
+			alert(localize('runInIsolationWorkerError', "Failed to create worker.js: {0}", err.message));
+		}
+	}
+}
+
+export class RunNormallyAction extends ExtensionAction {
+	static readonly ID = 'extensions.runNormally';
+	static readonly LABEL = localize('runNormallyAction', "Run Normally");
+	private static readonly Class = `${ExtensionAction.LABEL_ACTION_CLASS} run-normally`;
+
+	constructor(
+		@IFileService private readonly fileService: IFileService,
+		@IExtensionService private readonly extensionService: IExtensionService,
+		@IExtensionsWorkbenchService private readonly extensionsWorkbenchService: IExtensionsWorkbenchService
+	) {
+		super(RunNormallyAction.ID, RunNormallyAction.LABEL, RunNormallyAction.Class);
+		this.tooltip = localize('runNormallyActionToolTip', "Remove isolation mode and run this extension normally");
+		this.update();
+		this._register(this.extensionService.onDidChangeExtensions(() => this.update()));
+	}
+
+	get workerPath(): string | undefined {
+		if (this.extension && this.extension.local) {
+			const baseDir = this.extension.local.location.fsPath;
+			return path.join(baseDir, 'worker.js');
+		}
+		return undefined;
+	}
+
+	update(): void {
+		this.enabled = false;
+		if (this.extension && this.extension.local && this.extension.state === ExtensionState.Installed) {
+			if (!this.extension.isBuiltin && this.workerPath) {
+				this.fileService.exists(URI.file(this.workerPath)).then(exists => {
+					this.enabled = exists;
+				});
+			}
+		}
+	}
+
+	override async run(): Promise<any> {
+		if (!this.extension || !this.extension.local || !this.workerPath) {
+			return;
+		}
+
+		try {
+			const exists = await this.fileService.exists(URI.file(this.workerPath));
+			if (exists) {
+				await this.fileService.del(URI.file(this.workerPath));
+				this.extensionsWorkbenchService.markToRunNormally(this.extension);
+			}
+		} catch (err) {
+			alert(localize('runNormallyWorkerError', "Failed to remove worker.js: {0}", err.message));
+		}
+	}
+}
 
 export const showExtensionsWithIdsCommandId = 'workbench.extensions.action.showExtensionsWithIds';
 CommandsRegistry.registerCommand(showExtensionsWithIdsCommandId, function (accessor: ServicesAccessor, extensionIds: string[]) {

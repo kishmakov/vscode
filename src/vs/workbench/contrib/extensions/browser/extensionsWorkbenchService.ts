@@ -914,6 +914,8 @@ export class ExtensionsWorkbenchService extends Disposable implements IExtension
 	private readonly remoteExtensions: Extensions | null = null;
 	private readonly webExtensions: Extensions | null = null;
 	private readonly extensionsServers: Extensions[] = [];
+	private markedForIsolation: IExtension[] = [];
+	private markedForNormalExecution: IExtension[] = [];
 
 	private updatesCheckDelayer: ThrottledDelayer<void>;
 	private autoUpdateDelayer: ThrottledDelayer<void>;
@@ -1603,6 +1605,14 @@ export class ExtensionsWorkbenchService extends Disposable implements IExtension
 				this.telemetryService.publicLog2<ExtensionsAutoRestartEvent, ExtensionsAutoRestartClassification>('extensions:autorestart', { count: toAdd.length + toRemove.length, auto });
 			}
 		}
+
+		while (this.markedForIsolation.length > 0) {
+			this.onDidChangeExtensions(this.markedForIsolation.pop());
+		}
+
+		while (this.markedForNormalExecution.length > 0) {
+			this.onDidChangeExtensions(this.markedForNormalExecution.pop());
+		}
 	}
 
 	private getRuntimeState(extension: IExtension): ExtensionRuntimeState | undefined {
@@ -1610,6 +1620,14 @@ export class ExtensionsWorkbenchService extends Disposable implements IExtension
 		const runningExtension = this.extensionService.extensions.find(e => areSameExtensions({ id: e.identifier.value }, extension.identifier));
 		const reloadAction = this.extensionManagementServerService.remoteExtensionManagementServer ? ExtensionRuntimeActionType.ReloadWindow : ExtensionRuntimeActionType.RestartExtensions;
 		const reloadActionLabel = reloadAction === ExtensionRuntimeActionType.ReloadWindow ? nls.localize('reload', "reload window") : nls.localize('restart extensions', "restart extensions");
+
+		if (this.markedForIsolation.some(e => areSameExtensions(e.identifier, extension.identifier))) {
+			return { action: reloadAction, reason: `Please ${reloadActionLabel} to isolate this extension.` };
+		}
+
+		if (this.markedForNormalExecution.some(e => areSameExtensions(e.identifier, extension.identifier))) {
+			return { action: reloadAction, reason: `Please ${reloadActionLabel} to run this extension normally.` };
+		}
 
 		if (isUninstalled) {
 			const canRemoveRunningExtension = runningExtension && this.extensionService.canRemoveExtension(runningExtension);
@@ -2551,6 +2569,16 @@ export class ExtensionsWorkbenchService extends Disposable implements IExtension
 	setEnablement(extensions: IExtension | IExtension[], enablementState: EnablementState): Promise<void> {
 		extensions = Array.isArray(extensions) ? extensions : [extensions];
 		return this.promptAndSetEnablement(extensions, enablementState);
+	}
+
+	markToRunInIsolation(extension: IExtension) {
+		this.markedForIsolation.push(extension);
+		this.onDidChangeExtensions(extension);
+	}
+
+	markToRunNormally(extension: IExtension) {
+		this.markedForNormalExecution.push(extension);
+		this.onDidChangeExtensions(extension);
 	}
 
 	async uninstall(e: IExtension): Promise<void> {

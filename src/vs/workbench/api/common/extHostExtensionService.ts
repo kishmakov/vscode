@@ -466,7 +466,7 @@ export abstract class AbstractExtHostExtensionService extends Disposable impleme
 		});
 	}
 
-	private _doActivateExtension(extensionDescription: IExtensionDescription, reason: ExtensionActivationReason): Promise<ActivatedExtension> {
+	private async _doActivateExtension(extensionDescription: IExtensionDescription, reason: ExtensionActivationReason): Promise<ActivatedExtension> {
 		const event = getTelemetryActivationEvent(extensionDescription, reason);
 		type ActivatePluginClassification = {
 			owner: 'jrieken';
@@ -484,8 +484,21 @@ export abstract class AbstractExtHostExtensionService extends Disposable impleme
 
 		const extensionInternalStore = new DisposableStore(); // disposables that follow the extension lifecycle
 		const activationTimesBuilder = new ExtensionActivationTimesBuilder(reason.startup);
+
+		let fullEntryPoint = joinPath(extensionDescription.extensionLocation, entryPoint);
+		const workerPath = joinPath(extensionDescription.extensionLocation, './worker.js');
+
+		// Use the async fsExists method from IHostUtils
+		const workerPathExists = this._hostUtils.fsExists ? await this._hostUtils.fsExists(workerPath.fsPath) : false;
+		if (workerPathExists) {
+			const id = extensionDescription.identifier.value.replace(/\./g, '');
+			setAPI('h:id', id);
+			setAPI(`h:entry-point.${id}`, fullEntryPoint.fsPath);
+			fullEntryPoint = workerPath;
+		}
+
 		return Promise.all([
-			this._loadCommonJSModule<IExtensionModule>(extensionDescription, joinPath(extensionDescription.extensionLocation, entryPoint), activationTimesBuilder),
+			this._loadCommonJSModule<IExtensionModule>(extensionDescription, fullEntryPoint, activationTimesBuilder),
 			this._loadExtensionContext(extensionDescription, extensionInternalStore)
 		]).then(values => {
 			performance.mark(`code/extHost/willActivateExtension/${extensionDescription.identifier.value}`);
