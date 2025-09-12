@@ -491,7 +491,7 @@ export abstract class AbstractExtHostExtensionService extends Disposable impleme
 		// Use the async fsExists method from IHostUtils
 		const workerPathExists = this._hostUtils.fsExists ? await this._hostUtils.fsExists(workerPath.fsPath) : false;
 		if (workerPathExists) {
-			const id = extensionDescription.identifier.value.replace(/\./g, '');
+			const id = extensionDescription.identifier.value.replace(/\./g, '').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
 			setAPI('h:id', id);
 			setAPI(`h:entry-point.${id}`, fullEntryPoint.fsPath);
 			fullEntryPoint = workerPath;
