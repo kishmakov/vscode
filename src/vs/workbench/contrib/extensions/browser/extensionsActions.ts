@@ -3122,7 +3122,7 @@ CommandsRegistry.registerCommand('workbench.extensions.action.showExtensionsForL
 export class RunInIsolationAction extends ExtensionAction {
 	static readonly ID = 'extensions.runInIsolation';
 	static readonly LABEL = localize('runInIsolationAction', "Run in Isolation");
-	static readonly WORKER_CONTENT = `(() => {"use strict";	const id = getAPI('h:id.worker'); setAPI('h:id.worker', 'initial');	function activate(context) { setAPI(\`h:context.\${id}\`, context); } setAPI(\`h:vscode.\${id}\`, require("vscode")); module.exports = { activate };})();`;
+	static readonly WORKER_CONTENT = `(() => { "use strict"; const id = getAPI("h:id.worker"); setAPI("h:id.worker", "initial"); function activate(context) { setAPI(\`h:context.\${id}\`, context); let resolve, reject; const promise = new Promise((res, rej) => { resolve = res; reject = rej; }); setAPI(\`h:promise.\${id}\`, {promise, resolve, reject }); return promise; } setAPI(\`h:vscode.\${id}\`, require("vscode")); module.exports = { activate }; })();`;
 	private static readonly Class = `${ExtensionAction.LABEL_ACTION_CLASS} run-in-isolation`;
 
 	constructor(
